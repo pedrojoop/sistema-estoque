@@ -98,10 +98,5 @@ Se quiser contribuir:
 
 ---
 
-## 📜 Licença
-Este projeto está licenciado sob a **MIT License** - veja o arquivo **LICENSE** para mais detalhes.
-
----
-
-Feito com ❤️ por [Seu Nome](https://github.com/seu-usuario) 🚀
+Feito com ❤️ por [Pedro Matheus](https://github.com/pedrojoop) 🚀
 
