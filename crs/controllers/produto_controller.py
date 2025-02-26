@@ -1,12 +1,7 @@
 # controllers/produto_controller.py
-import sqlite3
+import psycopg2
 import json
-from models.produto import Produto
 from datetime import datetime
-
-class ProdutoController:
-    def __init__(self, db):
-        self.db = db
 
 class ProdutoController:
     def __init__(self, db):
@@ -15,31 +10,49 @@ class ProdutoController:
     def adicionar_produto(self, nome, fornecedor_id, valor, quantidade, regiao, data_validade):
         self.db.cursor.execute(
             '''INSERT INTO produtos (nome, fornecedor_id, valor, quantidade, regiao, data_validade, data_cadastro)
-               VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)''',
+               VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)''',
             (nome, fornecedor_id, valor, quantidade, regiao, data_validade)
         )
         self.db.conn.commit()
 
-
     def listar_produtos(self):
-        self.db.cursor.execute("SELECT id, nome, fornecedor_id, valor, quantidade, regiao, data_validade, data_cadastro FROM produtos")
+        self.db.cursor.execute("SELECT id, nome, fornecedor_id, valor, quantidade, regiao, data_validade, data_cadastro FROM produtos;")
         return self.db.cursor.fetchall()
     
     def atualizar_produto(self, produto_id, nome, fornecedor_id, valor, quantidade, regiao, data_validade):
-        self.db.cursor.execute('''UPDATE produtos SET nome=?, fornecedor_id=?, valor=?, quantidade=?, regiao=?, data_validade=?, data_cadastro=CURRENT_TIMESTAMP 
-                                  WHERE id=?''',
+        self.db.cursor.execute("SELECT * FROM produtos WHERE id=%s;", (produto_id,))
+        old_data = self.db.cursor.fetchone()
+        
+        self.db.cursor.execute('''UPDATE produtos 
+                                  SET nome=%s, fornecedor_id=%s, valor=%s, quantidade=%s, regiao=%s, data_validade=%s, data_cadastro=CURRENT_TIMESTAMP
+                                  WHERE id=%s''',
                                (nome, fornecedor_id, valor, quantidade, regiao, data_validade, produto_id))
         self.db.conn.commit()
 
+        self.registrar_log("UPDATE", "produtos", produto_id, {
+            "nome": nome,
+            "fornecedor_id": fornecedor_id,
+            "valor": valor,
+            "quantidade": quantidade,
+            "regiao": regiao,
+            "data_validade": data_validade
+        })
+
     def deletar_produto(self, produto_id):
-        self.db.cursor.execute("DELETE FROM produtos WHERE id=?", (produto_id,))
+        self.db.cursor.execute("SELECT * FROM produtos WHERE id=%s;", (produto_id,))
+        old_data = self.db.cursor.fetchone()
+        
+        self.db.cursor.execute("DELETE FROM produtos WHERE id=%s;", (produto_id,))
         self.db.conn.commit()
+
+        self.registrar_log("DELETE", "produtos", produto_id, old_data, None)
 
     def registrar_log(self, acao, tabela, id_alterado, valor_anterior, valor_novo):
         self.db.cursor.execute('''INSERT INTO logs (tipo_acao, tabela, id_alterado, data_hora, valor_anterior, valor_novo)
-                                  VALUES (?, ?, ?, ?, ?, ?)''',
+                                  VALUES (%s, %s, %s, %s, %s, %s)''',
                                (acao, tabela, id_alterado, datetime.now(), json.dumps(valor_anterior), json.dumps(valor_novo)))
         self.db.conn.commit()
+
         
     def desfazer_ultima_alteracao(self):
         self.db.cursor.execute("SELECT * FROM logs ORDER BY data_hora DESC LIMIT 1")

@@ -1,7 +1,6 @@
 # controllers/fornecedor_controller.py
-import sqlite3
+import psycopg2
 import json
-from models.fornecedor import Fornecedor
 from datetime import datetime
 
 class FornecedorController:
@@ -11,18 +10,22 @@ class FornecedorController:
     def adicionar_fornecedor(self, nome, cnpj, categoria, tipo_produto, regiao):
         self.db.cursor.execute(
             '''INSERT INTO fornecedores (nome, cnpj, categoria, tipo_produto, regiao, data_cadastro)
-               VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)''',
+               VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)''',
             (nome, cnpj, categoria, tipo_produto, regiao)
         )
         self.db.conn.commit()
         
     def listar_fornecedores(self):
-        self.db.cursor.execute("SELECT id, nome, cnpj, categoria, tipo_produto, regiao, data_cadastro FROM fornecedores")
+        self.db.cursor.execute("SELECT id, nome, cnpj, categoria, tipo_produto, regiao, data_cadastro FROM fornecedores;")
         return self.db.cursor.fetchall()
     
     def atualizar_fornecedor(self, fornecedor_id, nome, cnpj, categoria, tipo_produto, regiao):
-        self.db.cursor.execute('''UPDATE fornecedores SET nome=?, cnpj=?, categoria=?, tipo_produto=?, regiao=?, data_cadastro=CURRENT_TIMESTAMP 
-                                  WHERE id=?''',
+        self.db.cursor.execute("SELECT * FROM fornecedores WHERE id=%s;", (fornecedor_id,))
+        old_data = self.db.cursor.fetchone()
+        
+        self.db.cursor.execute('''UPDATE fornecedores 
+                                  SET nome=%s, cnpj=%s, categoria=%s, tipo_produto=%s, regiao=%s, data_cadastro=CURRENT_TIMESTAMP 
+                                  WHERE id=%s''',
                                (nome, cnpj, categoria, tipo_produto, regiao, fornecedor_id))
         self.db.conn.commit()
         
@@ -35,19 +38,20 @@ class FornecedorController:
         })
 
     def deletar_fornecedor(self, fornecedor_id):
-        self.db.cursor.execute("SELECT * FROM fornecedores WHERE id=?", (fornecedor_id,))
+        self.db.cursor.execute("SELECT * FROM fornecedores WHERE id=%s;", (fornecedor_id,))
         old_data = self.db.cursor.fetchone()
         
-        self.db.cursor.execute("DELETE FROM fornecedores WHERE id=?", (fornecedor_id,))
+        self.db.cursor.execute("DELETE FROM fornecedores WHERE id=%s;", (fornecedor_id,))
         self.db.conn.commit()
         
         self.registrar_log("DELETE", "fornecedores", fornecedor_id, old_data, None)
 
     def registrar_log(self, acao, tabela, id_alterado, valor_anterior, valor_novo):
         self.db.cursor.execute('''INSERT INTO logs (tipo_acao, tabela, id_alterado, data_hora, valor_anterior, valor_novo)
-                                  VALUES (?, ?, ?, ?, ?, ?)''',
+                                  VALUES (%s, %s, %s, %s, %s, %s)''',
                                (acao, tabela, id_alterado, datetime.now(), json.dumps(valor_anterior), json.dumps(valor_novo)))
         self.db.conn.commit()
+
 
     def desfazer_ultima_alteracao(self):
         self.db.cursor.execute("SELECT * FROM logs ORDER BY data_hora DESC LIMIT 1")
